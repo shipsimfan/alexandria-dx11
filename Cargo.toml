@@ -1,0 +1,11 @@
+[package]
+edition = "2021"
+name = "alexandria_dx11"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+alexandria_common = {path = "../alexandria-common"}
+ginger = {git = "https://github.com/shipsimfan/ginger.git"}
+win32 = {path = "../lib-win32"}
