@@ -51,7 +51,7 @@ impl alexandria_common::Shader for Shader {
             &shader_code,
             None,
             &[],
-            Some(&CString::new("pixel_main").unwrap()),
+            Some(&CString::new("fragment_main").unwrap()),
             &CString::new("ps_5_0").unwrap(),
             &[win32::D3DCompileFlag::EnableStrictness],
             &[],
