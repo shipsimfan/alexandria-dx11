@@ -22,9 +22,11 @@ impl alexandria_common::Shader for Shader {
         vertex_layout: &[(&str, Format)],
         window: &mut Self::Window<I>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        let hlsl_code = acsl::compile_hlsl(code)?;
+
         let device = window.device();
 
-        let shader_code = CString::new(code.as_ref()).unwrap();
+        let shader_code = CString::new(hlsl_code).unwrap();
         let (vertex_shader_blob, errors) = win32::d3d_compile(
             &shader_code,
             None,
@@ -95,9 +97,16 @@ impl alexandria_common::Shader for Shader {
 
     fn set_active(&mut self) {
         let mut device_context = self.device_context.borrow_mut();
-        device_context.ia_set_input_layout(&mut self.input_layout);
-        device_context.vs_set_shader(&mut self.vertex_shader);
-        device_context.ps_set_shader(&mut self.pixel_shader);
+        device_context.ia_set_input_layout(Some(&mut self.input_layout));
+        device_context.vs_set_shader(Some(&mut self.vertex_shader));
+        device_context.ps_set_shader(Some(&mut self.pixel_shader));
+    }
+
+    fn clear_active(&mut self) {
+        let mut device_context = self.device_context.borrow_mut();
+        device_context.ia_set_input_layout(None);
+        device_context.vs_set_shader(None);
+        device_context.ps_set_shader(None);
     }
 }
 

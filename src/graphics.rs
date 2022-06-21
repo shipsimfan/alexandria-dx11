@@ -14,6 +14,7 @@ pub enum GraphicsCreationErrorClass {
     DepthStencilView,
     Rasterizer,
     BlendState,
+    InfoQueue,
 }
 
 #[allow(unused)]
@@ -29,6 +30,9 @@ pub struct Graphics {
     blend_state: win32::ID3D11BlendState,
     rendering: bool,
     viewport: win32::D3D11Viewport,
+
+    #[cfg(debug_assertions)]
+    info_queue: win32::ID3D11InfoQueue,
 }
 
 #[derive(Debug)]
@@ -289,6 +293,17 @@ impl Graphics {
             )],
         );
 
+        #[cfg(debug_assertions)]
+        let info_queue = match device.query_interface() {
+            Ok(info_queue) => info_queue,
+            Err(error) => {
+                return Err(GraphicsCreationError::new(
+                    GraphicsCreationErrorClass::InfoQueue,
+                    error,
+                ))
+            }
+        };
+
         let blend_state = match device.create_blend_state(&blend_desc) {
             Ok(blend_state) => blend_state,
             Err(error) => {
@@ -311,6 +326,8 @@ impl Graphics {
             blend_state,
             rendering: false,
             viewport,
+            #[cfg(debug_assertions)]
+            info_queue,
         })
     }
 
@@ -339,6 +356,16 @@ impl Graphics {
         if self.rendering {
             self.swap_chain.present(1, 0)?;
             self.rendering = false;
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            let num_messages = self.info_queue.get_num_stored_messages();
+            for i in 0..num_messages {
+                let message = self.info_queue.get_message(i)?;
+                println!("DirectX11: {}", message.description());
+            }
+            self.info_queue.clear_stored_messages();
         }
 
         Ok(())
@@ -390,6 +417,7 @@ impl std::fmt::Display for GraphicsCreationErrorClass {
                     "Unable to create depth stencil view",
                 GraphicsCreationErrorClass::Rasterizer => "Unable to create rasterizer",
                 GraphicsCreationErrorClass::BlendState => "Unable to create blend state",
+                GraphicsCreationErrorClass::InfoQueue => "Unable to create info queue",
             }
         )
     }

@@ -64,13 +64,23 @@ impl<T: Sized> alexandria_common::ConstantBuffer<T> for ConstantBuffer<T> {
 
     fn set_active(&mut self) {
         let mut device_context = self.device_context.borrow_mut();
-        device_context.vs_set_constant_buffers(self.slot as u32, &mut [&mut self.constant_buffer]);
-        device_context.ps_set_constant_buffers(self.slot as u32, &mut [&mut self.constant_buffer]);
+        device_context
+            .vs_set_constant_buffers(self.slot as u32, &mut [Some(&mut self.constant_buffer)]);
+        device_context
+            .ps_set_constant_buffers(self.slot as u32, &mut [Some(&mut self.constant_buffer)]);
     }
 
+    fn clear_active(&mut self) {
+        let mut device_context = self.device_context.borrow_mut();
+        device_context.vs_set_constant_buffers(self.slot as u32, &mut [None]);
+        device_context.ps_set_constant_buffers(self.slot as u32, &mut [None]);
+    }
+
+    /*
     fn set_active_compute(&mut self) {
         self.device_context
             .borrow_mut()
             .cs_set_constant_buffers(self.slot as u32, &mut [&mut self.constant_buffer]);
     }
+    */
 }

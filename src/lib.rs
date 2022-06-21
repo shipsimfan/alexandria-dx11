@@ -4,13 +4,13 @@ mod constant_buffer;
 mod graphics;
 mod mesh;
 mod shader;
-mod texture;
+mod texture2d;
 mod window;
 
 pub use constant_buffer::*;
 pub use mesh::*;
 pub use shader::*;
-pub use texture::*;
+pub use texture2d::*;
 pub use window::*;
 
 fn alexandria_to_dxgi(format: &alexandria_common::Format) -> win32::DXGIFormat {
