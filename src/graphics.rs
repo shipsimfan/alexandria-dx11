@@ -294,8 +294,16 @@ impl Graphics {
         );
 
         #[cfg(debug_assertions)]
-        let info_queue = match device.query_interface() {
-            Ok(info_queue) => info_queue,
+        let info_queue = match device.query_interface::<win32::ID3D11InfoQueue>() {
+            Ok(mut info_queue) => match info_queue.push_empty_storage_filter() {
+                Ok(()) => info_queue,
+                Err(error) => {
+                    return Err(GraphicsCreationError::new(
+                        GraphicsCreationErrorClass::InfoQueue,
+                        error,
+                    ))
+                }
+            },
             Err(error) => {
                 return Err(GraphicsCreationError::new(
                     GraphicsCreationErrorClass::InfoQueue,
@@ -344,7 +352,7 @@ impl Graphics {
             0,
         );
         device_context.om_set_render_targets(
-            &mut [&mut self.render_target_view],
+            &mut [Some(&mut self.render_target_view)],
             Some(&mut self.depth_stencil_view),
         );
         device_context.ia_set_primitive_topology(win32::D3D11PrimitiveTopology::TriangleList);
@@ -354,6 +362,9 @@ impl Graphics {
 
     pub fn end_render(&mut self) -> Result<(), RenderError> {
         if self.rendering {
+            self.device_context
+                .borrow_mut()
+                .om_set_render_targets(&mut [None], None);
             self.swap_chain.present(1, 0)?;
             self.rendering = false;
         }
