@@ -5,6 +5,7 @@ use win32::DXGIFormat;
 
 pub struct Texture2D {
     _texture: win32::ID3D11Texture2D,
+    sampler: win32::ID3D11SamplerState,
     srv: win32::ID3D11ShaderResourceView,
     _uav: win32::ID3D11UnorderedAccessView,
     device_context: Rc<RefCell<win32::ID3D11DeviceContext>>,
@@ -60,8 +61,12 @@ impl alexandria_common::Texture2D for Texture2D {
             .device()
             .create_unordered_access_view(&mut texture, &uav_desc)?;
 
+        let sampler_desc = win32::D3D11SamplerDesc::default();
+        let sampler = window.device().create_sampler_state(&sampler_desc)?;
+
         Ok(Texture2D {
             _texture: texture,
+            sampler,
             srv,
             _uav,
             slot,
@@ -77,12 +82,16 @@ impl alexandria_common::Texture2D for Texture2D {
         let mut device_context = self.device_context.borrow_mut();
         device_context.vs_set_shader_resources(self.slot as u32, &mut [Some(&mut self.srv)]);
         device_context.ps_set_shader_resources(self.slot as u32, &mut [Some(&mut self.srv)]);
+        device_context.vs_set_samplers(self.slot as u32, &mut [Some(&mut self.sampler)]);
+        device_context.ps_set_samplers(self.slot as u32, &mut [Some(&mut self.sampler)]);
     }
 
     fn clear_active(&mut self) {
         let mut device_context = self.device_context.borrow_mut();
         device_context.vs_set_shader_resources(self.slot as u32, &mut [None]);
         device_context.ps_set_shader_resources(self.slot as u32, &mut [None]);
+        device_context.vs_set_samplers(self.slot as u32, &mut [None]);
+        device_context.ps_set_samplers(self.slot as u32, &mut [None]);
     }
 
     /*
