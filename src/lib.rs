@@ -2,12 +2,14 @@
 
 mod constant_buffer;
 mod graphics;
+mod matrix;
 mod mesh;
 mod shader;
 mod texture2d;
 mod window;
 
 pub use constant_buffer::*;
+pub use matrix::*;
 pub use mesh::*;
 pub use shader::*;
 pub use texture2d::*;
