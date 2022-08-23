@@ -1,4 +1,4 @@
-use crate::{Vector3, Vector4};
+use alexandria_common::{Vector3, Vector4};
 use std::ops::{Add, AddAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign};
 
 #[derive(Clone, Copy)]
@@ -82,11 +82,11 @@ impl Matrix {
         matrix
     }
 
-    pub fn rotation_x(θ: f32) -> Matrix {
+    pub fn rotation_x(angle: f32) -> Matrix {
         let mut matrix = Matrix::identity();
 
-        let c = θ.cos();
-        let s = θ.sin();
+        let c = angle.cos();
+        let s = angle.sin();
 
         matrix.set(1, 1, c);
         matrix.set(2, 1, -s);
@@ -96,11 +96,11 @@ impl Matrix {
         matrix
     }
 
-    pub fn rotation_y(θ: f32) -> Matrix {
+    pub fn rotation_y(angle: f32) -> Matrix {
         let mut matrix = Matrix::identity();
 
-        let c = θ.cos();
-        let s = θ.sin();
+        let c = angle.cos();
+        let s = angle.sin();
 
         matrix.set(0, 0, c);
         matrix.set(2, 0, s);
@@ -110,11 +110,11 @@ impl Matrix {
         matrix
     }
 
-    pub fn rotation_z(θ: f32) -> Matrix {
+    pub fn rotation_z(angle: f32) -> Matrix {
         let mut matrix = Matrix::identity();
 
-        let c = θ.cos();
-        let s = θ.sin();
+        let c = angle.cos();
+        let s = angle.sin();
 
         matrix.set(0, 0, c);
         matrix.set(1, 0, -s);
