@@ -1,17 +1,17 @@
 use alexandria_common::{Vector3, Vector4};
 use std::ops::{Add, AddAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign};
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub struct Matrix([f32; 4 * 4]);
+pub struct LHRowMajorMatrix([f32; 4 * 4]);
 
-impl Matrix {
+impl LHRowMajorMatrix {
     pub const fn zero() -> Self {
-        Matrix([0.0; 4 * 4])
+        LHRowMajorMatrix([0.0; 4 * 4])
     }
 
     pub fn identity() -> Self {
-        let mut matrix = Matrix::zero();
+        let mut matrix = LHRowMajorMatrix::zero();
         matrix.set(0, 0, 1.0);
         matrix.set(1, 1, 1.0);
         matrix.set(2, 2, 1.0);
@@ -19,12 +19,12 @@ impl Matrix {
         matrix
     }
 
-    pub fn look_at(position: Vector3, target: Vector3, up: Vector3) -> Matrix {
+    pub fn look_at(position: Vector3, target: Vector3, up: Vector3) -> LHRowMajorMatrix {
         let z_axis = (target - position).normal();
         let x_axis = (up.cross(z_axis)).normal();
         let y_axis = z_axis.cross(x_axis);
 
-        let mut matrix = Matrix::zero();
+        let mut matrix = LHRowMajorMatrix::zero();
         matrix.set(0, 0, x_axis.x());
         matrix.set(0, 1, x_axis.y());
         matrix.set(0, 2, x_axis.z());
@@ -41,24 +41,24 @@ impl Matrix {
         matrix
     }
 
-    pub fn scale(x: f32, y: f32, z: f32) -> Matrix {
-        let mut matrix = Matrix::identity();
+    pub fn scale(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
+        let mut matrix = LHRowMajorMatrix::identity();
         matrix.set(0, 0, x);
         matrix.set(1, 1, y);
         matrix.set(2, 2, z);
         matrix
     }
 
-    pub fn translation(x: f32, y: f32, z: f32) -> Matrix {
-        let mut matrix = Matrix::identity();
+    pub fn translation(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
+        let mut matrix = LHRowMajorMatrix::identity();
         matrix.set(0, 3, x);
         matrix.set(1, 3, y);
         matrix.set(2, 3, z);
         matrix
     }
 
-    pub fn rotation(x: f32, y: f32, z: f32) -> Matrix {
-        let mut matrix = Matrix::identity();
+    pub fn rotation(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
+        let mut matrix = LHRowMajorMatrix::identity();
 
         let cos_a = z.cos();
         let sin_a = z.sin();
@@ -82,8 +82,8 @@ impl Matrix {
         matrix
     }
 
-    pub fn rotation_x(angle: f32) -> Matrix {
-        let mut matrix = Matrix::identity();
+    pub fn rotation_x(angle: f32) -> LHRowMajorMatrix {
+        let mut matrix = LHRowMajorMatrix::identity();
 
         let c = angle.cos();
         let s = angle.sin();
@@ -96,8 +96,8 @@ impl Matrix {
         matrix
     }
 
-    pub fn rotation_y(angle: f32) -> Matrix {
-        let mut matrix = Matrix::identity();
+    pub fn rotation_y(angle: f32) -> LHRowMajorMatrix {
+        let mut matrix = LHRowMajorMatrix::identity();
 
         let c = angle.cos();
         let s = angle.sin();
@@ -110,8 +110,8 @@ impl Matrix {
         matrix
     }
 
-    pub fn rotation_z(angle: f32) -> Matrix {
-        let mut matrix = Matrix::identity();
+    pub fn rotation_z(angle: f32) -> LHRowMajorMatrix {
+        let mut matrix = LHRowMajorMatrix::identity();
 
         let c = angle.cos();
         let s = angle.sin();
@@ -124,8 +124,8 @@ impl Matrix {
         matrix
     }
 
-    pub fn orthographic(width: f32, height: f32, near: f32, far: f32) -> Matrix {
-        let mut matrix = Matrix::identity();
+    pub fn orthographic(width: f32, height: f32, near: f32, far: f32) -> LHRowMajorMatrix {
+        let mut matrix = LHRowMajorMatrix::identity();
         matrix.set(0, 0, 2.0 / width);
         matrix.set(1, 1, 2.0 / height);
         matrix.set(2, 2, 1.0 / (far - near));
@@ -133,11 +133,11 @@ impl Matrix {
         matrix
     }
 
-    pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) -> Matrix {
+    pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) -> LHRowMajorMatrix {
         let y_scale = 1.0 / (fovy / 2.0).tan();
         let x_scale = y_scale / aspect;
 
-        let mut matrix = Matrix::zero();
+        let mut matrix = LHRowMajorMatrix::zero();
         matrix.set(0, 0, x_scale);
         matrix.set(1, 1, y_scale);
         matrix.set(2, 2, far / (far - near));
@@ -155,10 +155,10 @@ impl Matrix {
     }
 }
 
-impl Add for Matrix {
-    type Output = Matrix;
+impl Add for LHRowMajorMatrix {
+    type Output = LHRowMajorMatrix;
 
-    fn add(mut self, rhs: Matrix) -> Matrix {
+    fn add(mut self, rhs: LHRowMajorMatrix) -> LHRowMajorMatrix {
         for i in 0..4 {
             for j in 0..4 {
                 self.set(i, j, self.get(i, j) + rhs.get(i, j))
@@ -169,16 +169,16 @@ impl Add for Matrix {
     }
 }
 
-impl AddAssign for Matrix {
-    fn add_assign(&mut self, rhs: Matrix) {
+impl AddAssign for LHRowMajorMatrix {
+    fn add_assign(&mut self, rhs: LHRowMajorMatrix) {
         *self = *self + rhs;
     }
 }
 
-impl Sub for Matrix {
-    type Output = Matrix;
+impl Sub for LHRowMajorMatrix {
+    type Output = LHRowMajorMatrix;
 
-    fn sub(mut self, rhs: Matrix) -> Matrix {
+    fn sub(mut self, rhs: LHRowMajorMatrix) -> LHRowMajorMatrix {
         for i in 0..4 {
             for j in 0..4 {
                 self.set(i, j, self.get(i, j) - rhs.get(i, j))
@@ -189,13 +189,13 @@ impl Sub for Matrix {
     }
 }
 
-impl SubAssign for Matrix {
-    fn sub_assign(&mut self, rhs: Matrix) {
+impl SubAssign for LHRowMajorMatrix {
+    fn sub_assign(&mut self, rhs: LHRowMajorMatrix) {
         *self = *self - rhs;
     }
 }
 
-impl Mul<Vector4> for Matrix {
+impl Mul<Vector4> for LHRowMajorMatrix {
     type Output = Vector4;
 
     fn mul(self, rhs: Vector4) -> Vector4 {
@@ -220,11 +220,11 @@ impl Mul<Vector4> for Matrix {
     }
 }
 
-impl Mul for Matrix {
-    type Output = Matrix;
+impl Mul for LHRowMajorMatrix {
+    type Output = LHRowMajorMatrix;
 
-    fn mul(self, rhs: Matrix) -> Matrix {
-        let mut ret = Matrix::zero();
+    fn mul(self, rhs: LHRowMajorMatrix) -> LHRowMajorMatrix {
+        let mut ret = LHRowMajorMatrix::zero();
 
         for i in 0..4 {
             for j in 0..4 {
@@ -238,25 +238,25 @@ impl Mul for Matrix {
     }
 }
 
-impl MulAssign for Matrix {
-    fn mul_assign(&mut self, rhs: Matrix) {
+impl MulAssign for LHRowMajorMatrix {
+    fn mul_assign(&mut self, rhs: LHRowMajorMatrix) {
         *self = *self * rhs;
     }
 }
 
-impl From<[f32; 4 * 4]> for Matrix {
-    fn from(vals: [f32; 4 * 4]) -> Matrix {
-        Matrix(vals)
+impl From<[f32; 4 * 4]> for LHRowMajorMatrix {
+    fn from(vals: [f32; 4 * 4]) -> LHRowMajorMatrix {
+        LHRowMajorMatrix(vals)
     }
 }
 
-impl Into<[f32; 4 * 4]> for Matrix {
+impl Into<[f32; 4 * 4]> for LHRowMajorMatrix {
     fn into(self) -> [f32; 4 * 4] {
         self.0
     }
 }
 
-impl Index<(usize, usize)> for Matrix {
+impl Index<(usize, usize)> for LHRowMajorMatrix {
     type Output = f32;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
@@ -264,13 +264,13 @@ impl Index<(usize, usize)> for Matrix {
     }
 }
 
-impl IndexMut<(usize, usize)> for Matrix {
+impl IndexMut<(usize, usize)> for LHRowMajorMatrix {
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
         &mut self.0[index.0 + index.1 * 4]
     }
 }
 
-impl std::fmt::Display for Matrix {
+impl std::fmt::Display for LHRowMajorMatrix {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for i in 0..4 {
             writeln!(
