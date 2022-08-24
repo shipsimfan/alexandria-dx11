@@ -1,16 +1,16 @@
-use alexandria_common::{Vector3, Vector4};
+use alexandria_common::{Matrix, Vector3, Vector4};
 use std::ops::{Add, AddAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign};
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct LHRowMajorMatrix([f32; 4 * 4]);
 
-impl LHRowMajorMatrix {
-    pub const fn zero() -> Self {
+impl Matrix for LHRowMajorMatrix {
+    fn zero() -> Self {
         LHRowMajorMatrix([0.0; 4 * 4])
     }
 
-    pub fn identity() -> Self {
+    fn identity() -> Self {
         let mut matrix = LHRowMajorMatrix::zero();
         matrix.set(0, 0, 1.0);
         matrix.set(1, 1, 1.0);
@@ -19,7 +19,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn look_at(position: Vector3, target: Vector3, up: Vector3) -> LHRowMajorMatrix {
+    fn look_at(position: Vector3, target: Vector3, up: Vector3) -> LHRowMajorMatrix {
         let z_axis = (target - position).normal();
         let x_axis = (up.cross(z_axis)).normal();
         let y_axis = z_axis.cross(x_axis);
@@ -41,7 +41,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn scale(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
+    fn scale(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
         let mut matrix = LHRowMajorMatrix::identity();
         matrix.set(0, 0, x);
         matrix.set(1, 1, y);
@@ -49,7 +49,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn translation(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
+    fn translation(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
         let mut matrix = LHRowMajorMatrix::identity();
         matrix.set(0, 3, x);
         matrix.set(1, 3, y);
@@ -57,7 +57,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn rotation(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
+    fn rotation(x: f32, y: f32, z: f32) -> LHRowMajorMatrix {
         let mut matrix = LHRowMajorMatrix::identity();
 
         let cos_a = z.cos();
@@ -82,7 +82,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn rotation_x(angle: f32) -> LHRowMajorMatrix {
+    fn rotation_x(angle: f32) -> LHRowMajorMatrix {
         let mut matrix = LHRowMajorMatrix::identity();
 
         let c = angle.cos();
@@ -96,7 +96,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn rotation_y(angle: f32) -> LHRowMajorMatrix {
+    fn rotation_y(angle: f32) -> LHRowMajorMatrix {
         let mut matrix = LHRowMajorMatrix::identity();
 
         let c = angle.cos();
@@ -110,7 +110,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn rotation_z(angle: f32) -> LHRowMajorMatrix {
+    fn rotation_z(angle: f32) -> LHRowMajorMatrix {
         let mut matrix = LHRowMajorMatrix::identity();
 
         let c = angle.cos();
@@ -124,7 +124,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn orthographic(width: f32, height: f32, near: f32, far: f32) -> LHRowMajorMatrix {
+    fn orthographic(width: f32, height: f32, near: f32, far: f32) -> LHRowMajorMatrix {
         let mut matrix = LHRowMajorMatrix::identity();
         matrix.set(0, 0, 2.0 / width);
         matrix.set(1, 1, 2.0 / height);
@@ -133,7 +133,7 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) -> LHRowMajorMatrix {
+    fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) -> LHRowMajorMatrix {
         let y_scale = 1.0 / (fovy / 2.0).tan();
         let x_scale = y_scale / aspect;
 
@@ -146,11 +146,11 @@ impl LHRowMajorMatrix {
         matrix
     }
 
-    pub fn get(&self, col: usize, row: usize) -> f32 {
+    fn get(&self, col: usize, row: usize) -> f32 {
         self.0[col * 4 + row]
     }
 
-    pub fn set(&mut self, col: usize, row: usize, val: f32) {
+    fn set(&mut self, col: usize, row: usize, val: f32) {
         self.0[col * 4 + row] = val
     }
 }
