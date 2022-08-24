@@ -186,6 +186,10 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
         &self.input
     }
 
+    fn input_mut(&mut self) -> &mut I {
+        &mut self.input
+    }
+
     fn begin_render(&mut self, clear_color: [f32; 4]) {
         self.graphics.as_mut().unwrap().begin_render(clear_color);
     }
