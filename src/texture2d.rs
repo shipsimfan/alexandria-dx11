@@ -1,4 +1,4 @@
-use alexandria_common::Input;
+use alexandria_common::{Input, SampleType};
 use ginger::{Image, Pixel};
 use std::{cell::RefCell, rc::Rc};
 use win32::DXGIFormat;
@@ -18,6 +18,7 @@ impl alexandria_common::Texture2D for Texture2D {
     fn new<I: Input>(
         image: &Image<f32>,
         slot: usize,
+        sample_type: SampleType,
         window: &mut Self::Window<I>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let initial_data = win32::D3D11SubresourceData::new(
@@ -61,7 +62,11 @@ impl alexandria_common::Texture2D for Texture2D {
             .device()
             .create_unordered_access_view(&mut texture, &uav_desc)?;
 
-        let sampler_desc = win32::D3D11SamplerDesc::default();
+        let mut sampler_desc = win32::D3D11SamplerDesc::default();
+        sampler_desc.set_filter(match sample_type {
+            SampleType::Point => win32::D3D11Filter::MinMagMipPoint,
+            SampleType::Linear => win32::D3D11Filter::Anisotropic,
+        });
         let sampler = window.device().create_sampler_state(&sampler_desc)?;
 
         Ok(Texture2D {
