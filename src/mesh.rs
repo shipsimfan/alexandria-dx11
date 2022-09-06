@@ -93,6 +93,7 @@ impl<V> alexandria_common::Mesh<V> for Mesh<V> {
         indices: &[u32],
         window: &mut Self::Window<I>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        self.index_count = indices.len() as u32;
         let index_buffer_desc = win32::D3D11BufferDesc::new(
             (std::mem::size_of::<u32>() * indices.len()) as u32,
             win32::D3D11Usage::Default,
