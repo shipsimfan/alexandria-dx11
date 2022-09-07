@@ -360,7 +360,7 @@ impl Graphics {
         device_context.rs_set_viewports(&[&self.viewport]);
     }
 
-    pub fn end_render(&mut self) -> Result<(), RenderError> {
+    pub fn end_render(&mut self, debug_logging: bool) -> Result<(), RenderError> {
         if self.rendering {
             self.device_context
                 .borrow_mut()
@@ -370,7 +370,7 @@ impl Graphics {
         }
 
         #[cfg(debug_assertions)]
-        {
+        if debug_logging {
             let num_messages = self.info_queue.get_num_stored_messages();
             for i in 0..num_messages {
                 let message = self.info_queue.get_message(i)?;

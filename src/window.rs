@@ -13,6 +13,8 @@ pub struct Window<I: Input> {
 
     mouse_center: (i32, i32),
     update_mouse_center: bool,
+
+    debug_logging: bool,
 }
 
 extern "C" fn message_router<I: Input>(
@@ -108,7 +110,12 @@ impl<I: Input> Window<I> {
 }
 
 impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
-    fn new(title: &str, width: usize, height: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    fn new(
+        title: &str,
+        width: usize,
+        height: usize,
+        debug_logging: bool,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         const STYLE: [win32::Ws; 5] = [
             win32::Ws::Border,
             win32::Ws::Caption,
@@ -127,6 +134,7 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
             height,
             mouse_center: (0, 0),
             update_mouse_center: true,
+            debug_logging,
         });
 
         // Register window class
@@ -195,7 +203,10 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
     }
 
     fn end_render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.graphics.as_mut().unwrap().end_render()?;
+        self.graphics
+            .as_mut()
+            .unwrap()
+            .end_render(self.debug_logging)?;
         Ok(())
     }
 
@@ -212,5 +223,9 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
         }
 
         true
+    }
+
+    fn set_debug_logging(&mut self, enable: bool) {
+        self.debug_logging = enable;
     }
 }
