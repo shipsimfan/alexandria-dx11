@@ -1,5 +1,5 @@
-use crate::graphics::Graphics;
-use alexandria_common::Input;
+use crate::{graphics::Graphics, Viewport};
+use alexandria_common::{Input, Vector2, Viewport as CommonViewport};
 use std::{cell::RefCell, ffi::CString, ptr::null, rc::Rc};
 
 pub struct Window<I: Input> {
@@ -15,7 +15,14 @@ pub struct Window<I: Input> {
     update_mouse_center: bool,
 
     debug_logging: bool,
+
+    minimized: bool,
+    in_size_move: bool,
+    window_size_changed: bool,
 }
+
+const MIN_SIZE_X: win32::Long = 800;
+const MIN_SIZE_Y: win32::Long = 600;
 
 extern "C" fn message_router<I: Input>(
     h_wnd: win32::HWnd,
@@ -51,6 +58,21 @@ impl<I: Input> Window<I> {
         l_param: win32::LParam,
     ) -> win32::LResult {
         match msg {
+            win32::WM_SIZE => match w_param == win32::SIZE_MINIMIZED {
+                true => self.minimized = true,
+                false => match self.minimized {
+                    true => self.minimized = false,
+                    false => self.update_size(),
+                },
+            },
+            win32::WM_ENTERSIZEMOVE => self.in_size_move = true,
+            win32::WM_EXITSIZEMOVE => {
+                self.in_size_move = false;
+                self.update_size();
+            }
+            win32::WM_GETMINMAXINFO => {
+                win32::MinMaxInfo::from_l_param(l_param).set_min_size(MIN_SIZE_X, MIN_SIZE_Y)
+            }
             win32::WM_DESTROY => win32::post_quit_message(0),
             win32::WM_CLOSE => win32::destroy_window(h_wnd).unwrap_or(()),
             win32::WM_WINDOWPOSCHANGED => {
@@ -107,22 +129,41 @@ impl<I: Input> Window<I> {
         .expect("Failed to convert coordinates!");
         self.update_mouse_center = false;
     }
+
+    fn update_size(&mut self) {
+        if self.h_wnd == null() {
+            return;
+        }
+
+        let rect = win32::get_window_rect(self.h_wnd).unwrap();
+        let new_width = (rect.right - rect.left) as usize;
+        let new_height = (rect.bottom - rect.top) as usize;
+
+        if new_width == self.width && new_height == self.height {
+            return;
+        }
+
+        self.width = new_width;
+        self.height = new_height;
+        self.window_size_changed = true;
+
+        let graphics = self.graphics.as_mut().unwrap();
+        graphics.resize_swap_chain(self.width as u32, self.height as u32);
+
+        graphics.update_viewports(Vector2::new(self.width as f32, self.height as f32));
+    }
 }
 
 impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
+    type Viewport = Viewport;
+
     fn new(
         title: &str,
         width: usize,
         height: usize,
         debug_logging: bool,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        const STYLE: [win32::Ws; 5] = [
-            win32::Ws::Border,
-            win32::Ws::Caption,
-            win32::Ws::MinimizeBox,
-            win32::Ws::SysMenu,
-            win32::Ws::Visible,
-        ];
+        const STYLE: &[win32::Ws] = &[win32::Ws::OverlappedWindow, win32::Ws::Visible];
 
         // Create window box
         let mut window = Box::new(Window {
@@ -135,6 +176,9 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
             mouse_center: (0, 0),
             update_mouse_center: true,
             debug_logging,
+            minimized: false,
+            in_size_move: false,
+            window_size_changed: false,
         });
 
         // Register window class
@@ -164,7 +208,7 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
             &[],
             &window_name,
             &window_name,
-            &STYLE,
+            STYLE,
             None,
             None,
             rect.right - rect.left,
@@ -194,12 +238,19 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
         &self.input
     }
 
+    fn size_changed(&self) -> bool {
+        self.window_size_changed
+    }
+
     fn input_mut(&mut self) -> &mut I {
         &mut self.input
     }
 
     fn begin_render(&mut self, clear_color: [f32; 4]) {
-        self.graphics.as_mut().unwrap().begin_render(clear_color);
+        let graphics = self.graphics.as_mut().unwrap();
+        graphics.begin_render(clear_color);
+        let default_viewport = graphics.default_viewport();
+        self.set_active_viewport(default_viewport);
     }
 
     fn end_render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -212,6 +263,7 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
 
     fn poll_events(&mut self) -> bool {
         self.input.frame_reset();
+        self.window_size_changed = false;
 
         while win32::peek_message(&mut self.msg, None, 0, 0, &[win32::Pm::Remove]) {
             if self.msg.message == win32::WM_QUIT {
@@ -227,5 +279,50 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
 
     fn set_debug_logging(&mut self, enable: bool) {
         self.debug_logging = enable;
+    }
+
+    fn create_viewport(
+        &mut self,
+        top_left: alexandria_common::Vector2,
+        size: alexandria_common::Vector2,
+        updater: Option<Box<dyn alexandria_common::ViewportUpdater>>,
+    ) -> usize {
+        self.graphics
+            .as_mut()
+            .unwrap()
+            .create_viewport(top_left, size, updater)
+    }
+
+    fn set_default_viewport(&mut self, viewport: usize) {
+        self.graphics
+            .as_mut()
+            .unwrap()
+            .set_default_viewport(viewport);
+    }
+
+    fn set_active_viewport(&mut self, viewport: usize) {
+        self.graphics
+            .as_mut()
+            .unwrap()
+            .get_viewport(viewport)
+            .map(|viewport| viewport.set_active());
+    }
+
+    fn update_viewport(
+        &mut self,
+        viewport: usize,
+        top_left: alexandria_common::Vector2,
+        size: alexandria_common::Vector2,
+    ) {
+        self.graphics
+            .as_mut()
+            .unwrap()
+            .get_viewport(viewport)
+            .unwrap()
+            .update(top_left, size);
+    }
+
+    fn remove_viewport(&mut self, viewport: usize) {
+        self.graphics.as_mut().unwrap().remove_viewport(viewport);
     }
 }

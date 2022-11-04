@@ -1,3 +1,5 @@
+use crate::Viewport;
+use alexandria_common::{Vector2, Viewport as CommonViewport};
 use std::{cell::RefCell, ptr::null, rc::Rc};
 
 #[derive(Debug)]
@@ -22,14 +24,17 @@ pub struct Graphics {
     swap_chain: win32::IDXGISwapChain,
     device: Rc<win32::ID3D11Device>,
     device_context: Rc<RefCell<win32::ID3D11DeviceContext>>,
-    render_target_view: win32::ID3D11RenderTargetView,
+    render_target_view: Option<win32::ID3D11RenderTargetView>,
     depth_stencil_buffer: win32::ID3D11Texture2D,
     depth_stencil_state: win32::ID3D11DepthStencilState,
-    depth_stencil_view: win32::ID3D11DepthStencilView,
+    depth_stencil_view: Option<win32::ID3D11DepthStencilView>,
     rasterizer_state: win32::ID3D11RasterizerState,
     blend_state: win32::ID3D11BlendState,
     rendering: bool,
-    viewport: win32::D3D11Viewport,
+
+    viewports: Vec<Viewport>,
+    new_viewport_key: usize,
+    default_viewport: usize,
 
     #[cfg(debug_assertions)]
     info_queue: win32::ID3D11InfoQueue,
@@ -43,6 +48,8 @@ pub struct GraphicsCreationError {
 
 #[derive(Debug)]
 pub struct RenderError(win32::DirectXError);
+
+const NUM_BUFFERS: u32 = 3;
 
 fn get_refresh_rate(width: u32, height: u32) -> Result<(u32, u32), GraphicsCreationError> {
     // Create a factory
@@ -104,6 +111,73 @@ fn get_refresh_rate(width: u32, height: u32) -> Result<(u32, u32), GraphicsCreat
     Ok((numerator, denominator))
 }
 
+fn create_render_target_view(
+    device: &win32::ID3D11Device,
+    swap_chain: &mut win32::IDXGISwapChain,
+) -> Result<win32::ID3D11RenderTargetView, GraphicsCreationError> {
+    let mut back_buffer = match swap_chain.get_buffer(0) {
+        Ok(buffer) => buffer,
+        Err(error) => {
+            return Err(GraphicsCreationError::new(
+                GraphicsCreationErrorClass::BackBuffer,
+                error,
+            ))
+        }
+    };
+    match device.create_render_target_view(&mut back_buffer, None) {
+        Ok(render_target_view) => Ok(render_target_view),
+        Err(error) => Err(GraphicsCreationError::new(
+            GraphicsCreationErrorClass::RenderTargetView,
+            error,
+        )),
+    }
+}
+
+fn create_depth_stencil_view(
+    device: &win32::ID3D11Device,
+    width: u32,
+    height: u32,
+) -> Result<(win32::ID3D11Texture2D, win32::ID3D11DepthStencilView), GraphicsCreationError> {
+    let depth_buffer_desc = win32::D3D11Texture2DDesc::new(
+        width,
+        height,
+        1,
+        1,
+        win32::DXGIFormat::D24UnormS8Uint,
+        1,
+        0,
+        win32::D3D11Usage::Default,
+        &[win32::D3D11BindFlag::DepthStencil],
+        &[],
+        &[],
+    );
+    let mut depth_stencil_buffer = match device.create_texture_2d(&depth_buffer_desc, None) {
+        Ok(texture) => texture,
+        Err(error) => {
+            return Err(GraphicsCreationError::new(
+                GraphicsCreationErrorClass::DepthStencilBuffer,
+                error,
+            ))
+        }
+    };
+
+    // Create depth stencil view
+    let depth_stencil_view_desc = win32::D3D11DepthStencilViewDesc::new(
+        win32::DXGIFormat::D24UnormS8Uint,
+        win32::D3D11DSVDimension::Texture2D,
+        &[],
+    );
+    match device.create_depth_stencil_view(&mut depth_stencil_buffer, &depth_stencil_view_desc) {
+        Ok(depth_stencil_view) => Ok((depth_stencil_buffer, depth_stencil_view)),
+        Err(error) => {
+            return Err(GraphicsCreationError::new(
+                GraphicsCreationErrorClass::DepthStencilView,
+                error,
+            ))
+        }
+    }
+}
+
 impl Graphics {
     pub fn new(
         handle: win32::HWnd,
@@ -115,7 +189,7 @@ impl Graphics {
 
         // Create device and swap chain
         let swap_chain_desc = win32::DXGISwapChainDesc::new(
-            3,
+            NUM_BUFFERS,
             width,
             height,
             win32::DXGIFormat::R8G8B8A8Unorm,
@@ -159,48 +233,11 @@ impl Graphics {
             };
 
         // Create render target view
-        let mut back_buffer = match swap_chain.get_buffer(0) {
-            Ok(buffer) => buffer,
-            Err(error) => {
-                return Err(GraphicsCreationError::new(
-                    GraphicsCreationErrorClass::BackBuffer,
-                    error,
-                ))
-            }
-        };
-        let render_target_view = match device.create_render_target_view(&mut back_buffer, None) {
-            Ok(render_target_view) => render_target_view,
-            Err(error) => {
-                return Err(GraphicsCreationError::new(
-                    GraphicsCreationErrorClass::RenderTargetView,
-                    error,
-                ))
-            }
-        };
+        let render_target_view = create_render_target_view(&device, &mut swap_chain)?;
 
-        // Create a depth buffer
-        let depth_buffer_desc = win32::D3D11Texture2DDesc::new(
-            width,
-            height,
-            1,
-            1,
-            win32::DXGIFormat::D24UnormS8Uint,
-            1,
-            0,
-            win32::D3D11Usage::Default,
-            &[win32::D3D11BindFlag::DepthStencil],
-            &[],
-            &[],
-        );
-        let mut depth_stencil_buffer = match device.create_texture_2d(&depth_buffer_desc, None) {
-            Ok(texture) => texture,
-            Err(error) => {
-                return Err(GraphicsCreationError::new(
-                    GraphicsCreationErrorClass::DepthStencilBuffer,
-                    error,
-                ))
-            }
-        };
+        // Create depth stencil buffer and view
+        let (depth_stencil_buffer, depth_stencil_view) =
+            create_depth_stencil_view(&device, width, height)?;
 
         // Create a depth stencil
         let depth_stencil_desc = win32::D3D11DepthStencilDesc::new(
@@ -231,24 +268,6 @@ impl Graphics {
 
         // Set depth stencil state
         device_context.om_set_depth_stencil_state(&mut depth_stencil_state, 1);
-
-        // Create depth stencil view
-        let depth_stencil_view_desc = win32::D3D11DepthStencilViewDesc::new(
-            win32::DXGIFormat::D24UnormS8Uint,
-            win32::D3D11DSVDimension::Texture2D,
-            &[],
-        );
-        let depth_stencil_view = match device
-            .create_depth_stencil_view(&mut depth_stencil_buffer, &depth_stencil_view_desc)
-        {
-            Ok(depth_stencil_view) => depth_stencil_view,
-            Err(error) => {
-                return Err(GraphicsCreationError::new(
-                    GraphicsCreationErrorClass::DepthStencilView,
-                    error,
-                ))
-            }
-        };
 
         // Create rasterizer
         let raster_desc = win32::D3D11RasterizerDesc::new(
@@ -326,17 +345,24 @@ impl Graphics {
             swap_chain,
             device: Rc::new(device),
             device_context: Rc::new(RefCell::new(device_context)),
-            render_target_view,
+            render_target_view: Some(render_target_view),
             depth_stencil_buffer,
             depth_stencil_state,
-            depth_stencil_view,
+            depth_stencil_view: Some(depth_stencil_view),
             rasterizer_state,
             blend_state,
             rendering: false,
-            viewport,
             #[cfg(debug_assertions)]
             info_queue,
+
+            viewports: Vec::with_capacity(4),
+            new_viewport_key: 0,
+            default_viewport: 0,
         })
+    }
+
+    pub fn default_viewport(&self) -> usize {
+        self.default_viewport
     }
 
     pub fn begin_render(&mut self, clear_color: [f32; 4]) {
@@ -344,20 +370,20 @@ impl Graphics {
 
         let mut device_context = self.device_context.borrow_mut();
 
-        device_context.clear_render_target_view(&mut self.render_target_view, clear_color);
+        device_context
+            .clear_render_target_view(self.render_target_view.as_mut().unwrap(), clear_color);
         device_context.clear_depth_stencil_view(
-            &mut self.depth_stencil_view,
+            self.depth_stencil_view.as_mut().unwrap(),
             &[win32::D3D11ClearFlag::Depth],
             1.0,
             0,
         );
         device_context.om_set_render_targets(
-            &mut [Some(&mut self.render_target_view)],
-            Some(&mut self.depth_stencil_view),
+            &mut [Some(self.render_target_view.as_mut().unwrap())],
+            Some(self.depth_stencil_view.as_mut().unwrap()),
         );
         device_context.ia_set_primitive_topology(win32::D3D11PrimitiveTopology::TriangleList);
         device_context.om_set_blend_state(&mut self.blend_state, [1.0, 1.0, 1.0, 1.0], u32::MAX);
-        device_context.rs_set_viewports(&[&self.viewport]);
     }
 
     pub fn end_render(&mut self, debug_logging: bool) -> Result<(), RenderError> {
@@ -380,6 +406,92 @@ impl Graphics {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn resize_swap_chain(&mut self, width: u32, height: u32) {
+        let mut device_context = self.device_context.borrow_mut();
+
+        // Clear render targets
+        device_context.om_set_render_targets(&mut [None], None);
+
+        // Release RTV and Depth/Stencil view
+        drop(self.render_target_view.take());
+        drop(self.depth_stencil_view.take());
+
+        // Call flush
+        device_context.flush();
+
+        // Resize the buffers on the swap chain
+        self.swap_chain
+            .resize_buffers(
+                NUM_BUFFERS,
+                width,
+                height,
+                win32::DXGIFormat::R8G8B8A8Unorm,
+                &[],
+            )
+            .unwrap();
+
+        // Create a new RTV and Depth/Stencil view
+        self.render_target_view =
+            Some(create_render_target_view(&self.device, &mut self.swap_chain).unwrap());
+        (self.depth_stencil_buffer, self.depth_stencil_view) =
+            create_depth_stencil_view(&self.device, width, height)
+                .map(|(dsb, dsv)| (dsb, Some(dsv)))
+                .unwrap();
+
+        // Update viewport
+        let viewport = win32::D3D11Viewport::new(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+        device_context.rs_set_viewports(&[&viewport]);
+    }
+
+    pub fn create_viewport(
+        &mut self,
+        top_left: alexandria_common::Vector2,
+        size: alexandria_common::Vector2,
+        updater: Option<Box<dyn alexandria_common::ViewportUpdater>>,
+    ) -> usize {
+        let key = self.new_viewport_key;
+        self.new_viewport_key += 1;
+        self.viewports.push(Viewport::new(
+            top_left,
+            size,
+            updater,
+            self.device_context.clone(),
+            key,
+        ));
+        key
+    }
+
+    pub fn update_viewports(&mut self, new_size: Vector2) {
+        for viewport in &mut self.viewports {
+            match viewport.updater() {
+                Some(updater) => {
+                    let (top_left, size) = updater.update_viewport(new_size);
+                    viewport.update(top_left, size);
+                }
+                None => {}
+            }
+        }
+    }
+
+    pub fn set_default_viewport(&mut self, viewport: usize) {
+        self.default_viewport = viewport;
+    }
+
+    pub fn get_viewport(&mut self, viewport_key: usize) -> Option<&mut Viewport> {
+        for viewport in &mut self.viewports {
+            if viewport.key() == viewport_key {
+                return Some(viewport);
+            }
+        }
+
+        None
+    }
+
+    pub fn remove_viewport(&mut self, viewport_key: usize) {
+        self.viewports
+            .retain(|viewport| viewport.key() != viewport_key);
     }
 
     pub fn device(&self) -> &Rc<win32::ID3D11Device> {

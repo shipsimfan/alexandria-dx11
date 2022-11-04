@@ -6,6 +6,7 @@ mod matrix;
 mod mesh;
 mod shader;
 mod texture2d;
+mod viewport;
 mod window;
 
 pub use constant_buffer::*;
@@ -13,6 +14,7 @@ pub use matrix::*;
 pub use mesh::*;
 pub use shader::*;
 pub use texture2d::*;
+pub use viewport::*;
 pub use window::*;
 
 fn alexandria_to_dxgi(format: &alexandria_common::Format) -> win32::DXGIFormat {
