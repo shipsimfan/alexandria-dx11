@@ -336,6 +336,9 @@ fn parse_key(key: u8) -> Option<Key> {
         x if x == Key::Backspace as u8 => Some(Key::Backspace),
         x if x == Key::Tab as u8 => Some(Key::Tab),
         x if x == Key::Enter as u8 => Some(Key::Enter),
+        x if x == Key::Shift as u8 => Some(Key::Shift),
+        x if x == Key::Control as u8 => Some(Key::Control),
+        x if x == Key::Alt as u8 => Some(Key::Alt),
         x if x == Key::Pause as u8 => Some(Key::Pause),
         x if x == Key::CapsLock as u8 => Some(Key::CapsLock),
         x if x == Key::Escape as u8 => Some(Key::Escape),
@@ -430,12 +433,6 @@ fn parse_key(key: u8) -> Option<Key> {
         x if x == Key::F24 as u8 => Some(Key::F24),
         x if x == Key::NumLock as u8 => Some(Key::NumLock),
         x if x == Key::ScrollLock as u8 => Some(Key::ScrollLock),
-        x if x == Key::LeftShift as u8 => Some(Key::LeftShift),
-        x if x == Key::RightShift as u8 => Some(Key::RightShift),
-        x if x == Key::LeftControl as u8 => Some(Key::LeftControl),
-        x if x == Key::RightControl as u8 => Some(Key::RightControl),
-        x if x == Key::LeftAlt as u8 => Some(Key::LeftAlt),
-        x if x == Key::RightAlt as u8 => Some(Key::RightAlt),
         _ => None,
     }
 }
