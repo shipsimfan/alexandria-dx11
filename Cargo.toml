@@ -3,8 +3,6 @@ edition = "2021"
 name = "alexandria_dx11"
 version = "0.1.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 acsl = {git = "https://github.com/shipsimfan/acsl.git"}
 alexandria_common = {git = "https://github.com/shipsimfan/alexandria-common.git"}
