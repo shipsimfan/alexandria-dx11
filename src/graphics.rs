@@ -369,6 +369,7 @@ impl Graphics {
         self.rendering = true;
 
         let mut device_context = self.device_context.borrow_mut();
+        device_context.flush();
 
         device_context
             .clear_render_target_view(self.render_target_view.as_mut().unwrap(), clear_color);

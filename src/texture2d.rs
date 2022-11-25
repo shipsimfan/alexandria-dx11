@@ -1,38 +1,53 @@
-use alexandria_common::{Input, SampleType};
-use ginger::{Image, Pixel};
-use std::{cell::RefCell, rc::Rc};
+use alexandria_common::{Input, SampleType, TextureFormat, TextureFormatClass};
+use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 use win32::DXGIFormat;
 
-pub struct Texture2D {
-    _texture: win32::ID3D11Texture2D,
+pub struct Texture2D<F: TextureFormat> {
+    texture: win32::ID3D11Texture2D,
     sampler: win32::ID3D11SamplerState,
     srv: win32::ID3D11ShaderResourceView,
     _uav: win32::ID3D11UnorderedAccessView,
     device_context: Rc<RefCell<win32::ID3D11DeviceContext>>,
     slot: usize,
+
+    phantom: PhantomData<F>,
 }
 
-impl alexandria_common::Texture2D for Texture2D {
+const fn class_to_format(texture_format_class: TextureFormatClass) -> DXGIFormat {
+    match texture_format_class {
+        TextureFormatClass::Unsigned8_1 => DXGIFormat::R8Uint,
+        TextureFormatClass::Unsigned8_4 => DXGIFormat::R8G8B8A8Uint,
+        TextureFormatClass::Unsigned16_1 => DXGIFormat::R16Uint,
+        TextureFormatClass::Unsigned32_1 => DXGIFormat::R32Uint,
+        TextureFormatClass::Signed8_1 => DXGIFormat::R8Sint,
+        TextureFormatClass::Signed16_1 => DXGIFormat::R16Sint,
+        TextureFormatClass::Signed32_1 => DXGIFormat::R32Sint,
+        TextureFormatClass::Float32_1 => DXGIFormat::R32Float,
+        TextureFormatClass::Float32_4 => DXGIFormat::R32G32B32A32Float,
+    }
+}
+
+impl<F: TextureFormat> alexandria_common::Texture2D<F> for Texture2D<F> {
     type Window<I: Input> = Box<crate::Window<I>>;
 
     fn new<I: Input>(
-        image: &Image<f32>,
+        image: &[F],
+        width: usize,
+        height: usize,
         slot: usize,
         sample_type: SampleType,
         window: &mut Self::Window<I>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let initial_data = win32::D3D11SubresourceData::new(
-            image.pixels(),
-            (std::mem::size_of::<Pixel<f32>>() * image.width()) as u32,
-            0,
-        );
+        let initial_data =
+            win32::D3D11SubresourceData::new(image, (std::mem::size_of::<F>() * width) as u32, 0);
 
+        let format = class_to_format(F::CLASS);
         let desc = win32::D3D11Texture2DDesc::new(
-            image.width() as u32,
-            image.height() as u32,
+            width as u32,
+            height as u32,
             1,
             1,
-            DXGIFormat::R32G32B32A32Float,
+            format,
             1,
             0,
             win32::D3D11Usage::Default,
@@ -48,15 +63,13 @@ impl alexandria_common::Texture2D for Texture2D {
             .device()
             .create_texture_2d(&desc, Some(&initial_data))?;
 
-        let srv_desc =
-            win32::D3D11ShaderResourceViewDesc::new(DXGIFormat::R32G32B32A32Float, &mut texture);
+        let srv_desc = win32::D3D11ShaderResourceViewDesc::new(format, &mut texture);
 
         let srv = window
             .device()
             .create_shader_resource_view(&mut texture, &srv_desc)?;
 
-        let uav_desc =
-            win32::D3D11UnorderedAccessViewDesc::new(DXGIFormat::R32G32B32A32Float, &mut texture);
+        let uav_desc = win32::D3D11UnorderedAccessViewDesc::new(format, &mut texture);
 
         let _uav = window
             .device()
@@ -70,12 +83,13 @@ impl alexandria_common::Texture2D for Texture2D {
         let sampler = window.device().create_sampler_state(&sampler_desc)?;
 
         Ok(Texture2D {
-            _texture: texture,
+            texture,
             sampler,
             srv,
             _uav,
             slot,
             device_context: window.device_context().clone(),
+            phantom: PhantomData,
         })
     }
 
@@ -112,4 +126,22 @@ impl alexandria_common::Texture2D for Texture2D {
             .cs_set_unordered_access_views(self.slot as u32, &mut [Some(&mut self.uav)]);
     }
     */
+
+    fn update_region(&mut self, region: alexandria_common::UpdateRegion, data: &[F]) {
+        self.device_context.borrow_mut().update_subresource(
+            &mut self.texture,
+            0,
+            Some(&win32::D3D11Box {
+                left: region.left() as u32,
+                right: (region.left() + region.width()) as u32,
+                top: region.top() as u32,
+                bottom: (region.top() + region.height()) as u32,
+                front: 0,
+                back: 1,
+            }),
+            data,
+            (std::mem::size_of::<F>() * region.width()) as u32,
+            0,
+        )
+    }
 }
