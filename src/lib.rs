@@ -1,5 +1,3 @@
-#![feature(generic_associated_types)]
-
 mod constant_buffer;
 mod graphics;
 mod matrix;

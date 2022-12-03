@@ -1,6 +1,7 @@
 use crate::{graphics::Graphics, Viewport};
 use alexandria_common::{Input, Key, MouseButton, Vector2, Viewport as CommonViewport};
 use std::{cell::RefCell, ffi::CString, ptr::null, rc::Rc};
+use win32::RawInput;
 
 pub struct Window<I: Input> {
     input: I,
@@ -78,12 +79,6 @@ impl<I: Input> Window<I> {
             win32::WM_WINDOWPOSCHANGED => {
                 self.update_mouse_center = true;
             }
-            win32::WM_KEYDOWN => {
-                parse_key(w_param as u8).map(|key| self.input.key_down(key));
-            }
-            win32::WM_KEYUP => {
-                parse_key(w_param as u8).map(|key| self.input.key_up(key));
-            }
             win32::WM_LBUTTONDOWN => self.input.mouse_down(MouseButton::Primary),
             win32::WM_LBUTTONUP => self.input.mouse_up(MouseButton::Primary),
             win32::WM_RBUTTONDOWN => self.input.mouse_down(MouseButton::Secondary),
@@ -107,6 +102,39 @@ impl<I: Input> Window<I> {
             win32::WM_SETFOCUS => {
                 if self.input.is_mouse_locked() {
                     self.reset_mouse_position();
+                }
+            }
+            win32::WM_INPUT => {
+                let mut size = 0;
+                win32::get_raw_input_data(
+                    l_param,
+                    win32::RawInputDataCommand::Input,
+                    None,
+                    &mut size,
+                );
+
+                let mut data = vec![0; size as usize];
+                win32::get_raw_input_data(
+                    l_param,
+                    win32::RawInputDataCommand::Input,
+                    Some(&mut data),
+                    &mut size,
+                );
+
+                let raw = RawInput::from(&data);
+
+                let key = match raw.keyboard() {
+                    Some(key) => key,
+                    None => return 0,
+                };
+
+                let pressed = key.pressed();
+                match parse_vkey(&key) {
+                    Some(key) => match pressed {
+                        true => self.input.key_down(key),
+                        false => self.input.key_up(key),
+                    },
+                    None => {}
                 }
             }
             _ => return win32::def_window_proc(h_wnd, msg, w_param, l_param),
@@ -223,6 +251,14 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
             Some(window.as_ref() as *const _ as *const _),
         )?;
 
+        // Register Raw Input
+        win32::register_raw_input_devices(&[win32::RawInputDevice::new(
+            win32::RawInputUsage::GenericKeyboard,
+            &[win32::RawInputFlag::NoLegacy],
+            None,
+        )])?;
+
+        // Create Graphics
         window.graphics = Some(Graphics::new(window.h_wnd, width as u32, height as u32)?);
 
         window.update_mouse_center();
@@ -331,108 +367,182 @@ impl<I: Input> alexandria_common::Window<I> for Box<Window<I>> {
     }
 }
 
-fn parse_key(key: u8) -> Option<Key> {
-    match key {
-        x if x == Key::Backspace as u8 => Some(Key::Backspace),
-        x if x == Key::Tab as u8 => Some(Key::Tab),
-        x if x == Key::Enter as u8 => Some(Key::Enter),
-        x if x == Key::Shift as u8 => Some(Key::Shift),
-        x if x == Key::Control as u8 => Some(Key::Control),
-        x if x == Key::Alt as u8 => Some(Key::Alt),
-        x if x == Key::Pause as u8 => Some(Key::Pause),
-        x if x == Key::CapsLock as u8 => Some(Key::CapsLock),
-        x if x == Key::Escape as u8 => Some(Key::Escape),
-        x if x == Key::Space as u8 => Some(Key::Space),
-        x if x == Key::PageUp as u8 => Some(Key::PageUp),
-        x if x == Key::PageDown as u8 => Some(Key::PageDown),
-        x if x == Key::End as u8 => Some(Key::End),
-        x if x == Key::Home as u8 => Some(Key::Home),
-        x if x == Key::LeftArrow as u8 => Some(Key::LeftArrow),
-        x if x == Key::UpArrow as u8 => Some(Key::UpArrow),
-        x if x == Key::RightArrow as u8 => Some(Key::RightArrow),
-        x if x == Key::DownArrow as u8 => Some(Key::DownArrow),
-        x if x == Key::PrintScreen as u8 => Some(Key::PrintScreen),
-        x if x == Key::Insert as u8 => Some(Key::Insert),
-        x if x == Key::Delete as u8 => Some(Key::Delete),
-        x if x == Key::_0 as u8 => Some(Key::_0),
-        x if x == Key::_1 as u8 => Some(Key::_1),
-        x if x == Key::_2 as u8 => Some(Key::_2),
-        x if x == Key::_3 as u8 => Some(Key::_3),
-        x if x == Key::_4 as u8 => Some(Key::_4),
-        x if x == Key::_5 as u8 => Some(Key::_5),
-        x if x == Key::_6 as u8 => Some(Key::_6),
-        x if x == Key::_7 as u8 => Some(Key::_7),
-        x if x == Key::_8 as u8 => Some(Key::_8),
-        x if x == Key::_9 as u8 => Some(Key::_9),
-        x if x == Key::A as u8 => Some(Key::A),
-        x if x == Key::B as u8 => Some(Key::B),
-        x if x == Key::C as u8 => Some(Key::C),
-        x if x == Key::D as u8 => Some(Key::D),
-        x if x == Key::E as u8 => Some(Key::E),
-        x if x == Key::F as u8 => Some(Key::F),
-        x if x == Key::G as u8 => Some(Key::G),
-        x if x == Key::H as u8 => Some(Key::H),
-        x if x == Key::I as u8 => Some(Key::I),
-        x if x == Key::J as u8 => Some(Key::J),
-        x if x == Key::K as u8 => Some(Key::K),
-        x if x == Key::L as u8 => Some(Key::L),
-        x if x == Key::M as u8 => Some(Key::M),
-        x if x == Key::N as u8 => Some(Key::N),
-        x if x == Key::O as u8 => Some(Key::O),
-        x if x == Key::P as u8 => Some(Key::P),
-        x if x == Key::Q as u8 => Some(Key::Q),
-        x if x == Key::R as u8 => Some(Key::R),
-        x if x == Key::S as u8 => Some(Key::S),
-        x if x == Key::T as u8 => Some(Key::T),
-        x if x == Key::U as u8 => Some(Key::U),
-        x if x == Key::V as u8 => Some(Key::V),
-        x if x == Key::W as u8 => Some(Key::W),
-        x if x == Key::X as u8 => Some(Key::X),
-        x if x == Key::Y as u8 => Some(Key::Y),
-        x if x == Key::Z as u8 => Some(Key::Z),
-        x if x == Key::Windows as u8 => Some(Key::Windows),
-        x if x == Key::Numpad0 as u8 => Some(Key::Numpad0),
-        x if x == Key::Numpad1 as u8 => Some(Key::Numpad1),
-        x if x == Key::Numpad2 as u8 => Some(Key::Numpad2),
-        x if x == Key::Numpad3 as u8 => Some(Key::Numpad3),
-        x if x == Key::Numpad4 as u8 => Some(Key::Numpad4),
-        x if x == Key::Numpad5 as u8 => Some(Key::Numpad5),
-        x if x == Key::Numpad6 as u8 => Some(Key::Numpad6),
-        x if x == Key::Numpad7 as u8 => Some(Key::Numpad7),
-        x if x == Key::Numpad8 as u8 => Some(Key::Numpad8),
-        x if x == Key::Numpad9 as u8 => Some(Key::Numpad9),
-        x if x == Key::Multiply as u8 => Some(Key::Multiply),
-        x if x == Key::Add as u8 => Some(Key::Add),
-        x if x == Key::Seperator as u8 => Some(Key::Seperator),
-        x if x == Key::Subtract as u8 => Some(Key::Subtract),
-        x if x == Key::Decimal as u8 => Some(Key::Decimal),
-        x if x == Key::Divide as u8 => Some(Key::Divide),
-        x if x == Key::F1 as u8 => Some(Key::F1),
-        x if x == Key::F2 as u8 => Some(Key::F2),
-        x if x == Key::F3 as u8 => Some(Key::F3),
-        x if x == Key::F4 as u8 => Some(Key::F4),
-        x if x == Key::F5 as u8 => Some(Key::F5),
-        x if x == Key::F6 as u8 => Some(Key::F6),
-        x if x == Key::F7 as u8 => Some(Key::F7),
-        x if x == Key::F8 as u8 => Some(Key::F8),
-        x if x == Key::F9 as u8 => Some(Key::F9),
-        x if x == Key::F10 as u8 => Some(Key::F10),
-        x if x == Key::F11 as u8 => Some(Key::F11),
-        x if x == Key::F12 as u8 => Some(Key::F12),
-        x if x == Key::F13 as u8 => Some(Key::F13),
-        x if x == Key::F14 as u8 => Some(Key::F14),
-        x if x == Key::F15 as u8 => Some(Key::F15),
-        x if x == Key::F16 as u8 => Some(Key::F16),
-        x if x == Key::F17 as u8 => Some(Key::F17),
-        x if x == Key::F18 as u8 => Some(Key::F18),
-        x if x == Key::F19 as u8 => Some(Key::F19),
-        x if x == Key::F20 as u8 => Some(Key::F20),
-        x if x == Key::F21 as u8 => Some(Key::F21),
-        x if x == Key::F22 as u8 => Some(Key::F22),
-        x if x == Key::F23 as u8 => Some(Key::F23),
-        x if x == Key::F24 as u8 => Some(Key::F24),
-        x if x == Key::NumLock as u8 => Some(Key::NumLock),
-        x if x == Key::ScrollLock as u8 => Some(Key::ScrollLock),
-        _ => None,
+fn parse_vkey(key: &win32::RawKeyboard) -> Option<Key> {
+    let key_code = key.make_code() as usize & 0x7F;
+
+    if key_code >= key::CODES.len() {
+        None
+    } else {
+        match key_code {
+            0x1C => Some(match key.e0() {
+                false => Key::Enter,
+                true => Key::NumpadEnter,
+            }),
+            0x1D => Some(match key.e0() {
+                false => match key.e1() {
+                    true => Key::Pause,
+                    false => Key::LeftControl,
+                },
+                true => Key::RightControl,
+            }),
+            0x2A => match key.e0() {
+                false => Some(Key::LeftShift),
+                true => None,
+            },
+            0x35 => Some(match key.e0() {
+                false => Key::ForwardSlash,
+                true => Key::NumpadDivide,
+            }),
+            0x37 => Some(match key.e0() {
+                false => Key::NumpadMultiply,
+                true => Key::PrintScreen,
+            }),
+            0x38 => Some(match key.e0() {
+                false => Key::LeftAlt,
+                true => Key::RightAlt,
+            }),
+            0x47 => Some(match key.e0() {
+                false => Key::Numpad7,
+                true => Key::Home,
+            }),
+            0x48 => Some(match key.e0() {
+                false => Key::Numpad8,
+                true => Key::UpArrow,
+            }),
+            0x49 => Some(match key.e0() {
+                false => Key::Numpad9,
+                true => Key::PageUp,
+            }),
+            0x4B => Some(match key.e0() {
+                false => Key::Numpad4,
+                true => Key::LeftArrow,
+            }),
+            0x4D => Some(match key.e0() {
+                false => Key::Numpad6,
+                true => Key::RightArrow,
+            }),
+            0x4F => Some(match key.e0() {
+                false => Key::Numpad1,
+                true => Key::End,
+            }),
+            0x50 => Some(match key.e0() {
+                false => Key::Numpad2,
+                true => Key::DownArrow,
+            }),
+            0x51 => Some(match key.e0() {
+                false => Key::Numpad3,
+                true => Key::PageDown,
+            }),
+            0x52 => Some(match key.e0() {
+                false => Key::Numpad0,
+                true => Key::Insert,
+            }),
+            0x53 => Some(match key.e0() {
+                false => Key::NumpadDecimal,
+                true => Key::Delete,
+            }),
+            _ => key::CODES[key_code],
+        }
     }
+}
+
+mod key {
+    use alexandria_common::Key::{self, *};
+
+    pub const CODES: &[Option<Key>] = &[
+        None,
+        Some(Escape),
+        Some(_1),
+        Some(_2),
+        Some(_3),
+        Some(_4),
+        Some(_5),
+        Some(_6),
+        Some(_7),
+        Some(_8),
+        Some(_9),
+        Some(_0),
+        Some(Dash),
+        Some(Equal),
+        Some(Backspace),
+        Some(Tab),
+        Some(Q),
+        Some(W),
+        Some(E),
+        Some(R),
+        Some(T),
+        Some(Y),
+        Some(U),
+        Some(I),
+        Some(O),
+        Some(P),
+        Some(LeftSquareBracket),
+        Some(RightSquareBracket),
+        Some(Enter),
+        Some(LeftControl),
+        Some(A),
+        Some(S),
+        Some(D),
+        Some(F),
+        Some(G),
+        Some(H),
+        Some(J),
+        Some(K),
+        Some(L),
+        Some(SemiColon),
+        Some(Quote),
+        Some(Tilde),
+        Some(LeftShift),
+        Some(BackSlash),
+        Some(Z),
+        Some(X),
+        Some(C),
+        Some(V),
+        Some(B),
+        Some(N),
+        Some(M),
+        Some(Comma),
+        Some(Period),
+        Some(ForwardSlash),
+        Some(RightShift),
+        Some(NumpadMultiply),
+        Some(LeftAlt),
+        Some(Space),
+        Some(CapsLock),
+        Some(F1),
+        Some(F2),
+        Some(F3),
+        Some(F4),
+        Some(F5),
+        Some(F6),
+        Some(F7),
+        Some(F8),
+        Some(F9),
+        Some(F10),
+        None, // Num lock removed due to conflict with pause key, Num lock shouldn't really be used by any games anyways
+        Some(ScrollLock),
+        Some(Numpad7),
+        Some(Numpad8),
+        Some(Numpad9),
+        Some(NumpadSubtract),
+        Some(Numpad4),
+        Some(Numpad5),
+        Some(Numpad6),
+        Some(NumpadAdd),
+        Some(Numpad1),
+        Some(Numpad2),
+        Some(Numpad3),
+        Some(Numpad0),
+        Some(NumpadDecimal),
+        None, // 0x54
+        None,
+        None,
+        Some(F11),
+        Some(F12),
+        None, // 0x59
+        None,
+        Some(Windows),
+        None, // 0x5C
+        Some(Menu),
+    ];
 }
